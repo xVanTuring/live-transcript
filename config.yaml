@@ -1,0 +1,27 @@
+server:
+  host: "0.0.0.0"
+  port: 8765
+
+streaming_engine:
+  provider: "sherpa-onnx"
+  model_dir: "./models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20"
+  num_threads: 2
+  sample_rate: 16000
+  endpoint:
+    rule1_min_trailing_silence: 2.4
+    rule2_min_trailing_silence: 1.2
+    rule3_min_utterance_length: 20.0
+
+correction_engine:
+  provider: "sensevoice"
+  model: "FunAudioLLM/SenseVoiceSmall"
+  device: "cpu"
+  batch_size: 1
+
+audio:
+  sample_rate: 16000
+  chunk_duration_ms: 60
+  ring_buffer_seconds: 60
+
+protocol:
+  debounce_partial_ms: 100

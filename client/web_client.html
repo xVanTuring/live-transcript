@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Transcript</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+         max-width: 800px; margin: 0 auto; padding: 20px; background: #1a1a2e; color: #eee; }
+  h1 { text-align: center; margin-bottom: 20px; color: #e94560; }
+  .controls { text-align: center; margin-bottom: 20px; }
+  button { padding: 12px 32px; font-size: 16px; border: none; border-radius: 8px;
+           cursor: pointer; margin: 0 8px; transition: all 0.2s; }
+  #startBtn { background: #e94560; color: white; }
+  #startBtn:hover { background: #c73550; }
+  #startBtn:disabled { background: #555; cursor: not-allowed; }
+  #stopBtn { background: #444; color: white; }
+  #stopBtn:hover { background: #666; }
+  #stopBtn:disabled { background: #333; cursor: not-allowed; }
+  .status { text-align: center; margin-bottom: 16px; font-size: 14px; color: #888; }
+  .status.connected { color: #4caf50; }
+  .status.error { color: #e94560; }
+  #transcript { background: #16213e; border-radius: 12px; padding: 20px;
+                min-height: 300px; line-height: 1.8; font-size: 16px; }
+  .segment { margin-bottom: 8px; }
+  .segment.partial { color: #aaa; }
+  .segment.final { color: #fff; }
+  .segment .label { font-size: 11px; color: #555; margin-right: 8px; }
+</style>
+</head>
+<body>
+
+<h1>Live Transcript</h1>
+
+<div class="controls">
+  <button id="startBtn" onclick="start()">Start</button>
+  <button id="stopBtn" onclick="stop()" disabled>Stop</button>
+</div>
+<div id="status" class="status">Ready</div>
+<div id="transcript"></div>
+
+<script>
+const SAMPLE_RATE = 16000;
+const CHUNK_DURATION_MS = 60;
+const WS_URL = `ws://${location.hostname || 'localhost'}:8765/ws/transcribe`;
+
+let ws = null;
+let audioContext = null;
+let workletNode = null;
+let mediaStream = null;
+let segments = {};  // segment_id -> {text, type}
+
+function setStatus(text, cls = '') {
+  const el = document.getElementById('status');
+  el.textContent = text;
+  el.className = 'status ' + cls;
+}
+
+function renderTranscript() {
+  const el = document.getElementById('transcript');
+  const ids = Object.keys(segments).map(Number).sort((a, b) => a - b);
+  el.innerHTML = ids.map(id => {
+    const seg = segments[id];
+    const cls = seg.type === 'final' ? 'final' : 'partial';
+    return `<span class="segment ${cls}">${seg.text}</span>`;
+  }).join(' ');
+  el.scrollTop = el.scrollHeight;
+}
+
+async function start() {
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('stopBtn').disabled = false;
+  segments = {};
+  renderTranscript();
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: SAMPLE_RATE, channelCount: 1, echoCancellation: true }
+    });
+
+    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+
+    // AudioWorklet for real-time PCM extraction
+    await audioContext.audioWorklet.addModule(createWorkletURL());
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    workletNode = new AudioWorkletNode(audioContext, 'pcm-processor');
+
+    ws = new WebSocket(WS_URL);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+      setStatus('Connected, starting...', 'connected');
+      ws.send(JSON.stringify({
+        type: 'start',
+        config: {
+          sample_rate: audioContext.sampleRate,
+          encoding: 'pcm_s16le',
+          channels: 1,
+          language: 'auto',
+          enable_correction: true
+        }
+      }));
+    };
+
+    ws.onmessage = (e) => {
+      const event = JSON.parse(e.data);
+      handleEvent(event);
+    };
+
+    ws.onerror = () => setStatus('WebSocket error', 'error');
+    ws.onclose = () => setStatus('Disconnected');
+
+    workletNode.port.onmessage = (e) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        // Convert float32 to int16 PCM
+        const float32 = e.data;
+        const int16 = new Int16Array(float32.length);
+        for (let i = 0; i < float32.length; i++) {
+          int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
+        }
+        ws.send(int16.buffer);
+      }
+    };
+
+    source.connect(workletNode);
+    workletNode.connect(audioContext.destination);
+
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'error');
+    document.getElementById('startBtn').disabled = false;
+    document.getElementById('stopBtn').disabled = true;
+  }
+}
+
+function stop() {
+  document.getElementById('startBtn').disabled = false;
+  document.getElementById('stopBtn').disabled = true;
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: 'stop' }));
+    setTimeout(() => ws.close(), 1000);
+  }
+  if (workletNode) { workletNode.disconnect(); workletNode = null; }
+  if (audioContext) { audioContext.close(); audioContext = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+
+  setStatus('Stopped');
+}
+
+function handleEvent(event) {
+  switch (event.type) {
+    case 'ready':
+      setStatus('Listening...', 'connected');
+      break;
+    case 'partial':
+    case 'correction':
+      segments[event.segment_id] = { text: event.text, type: 'partial' };
+      renderTranscript();
+      break;
+    case 'final':
+      segments[event.segment_id] = { text: event.text, type: 'final' };
+      renderTranscript();
+      break;
+    case 'error':
+      setStatus(`Error: ${event.code} - ${event.message}`, 'error');
+      break;
+  }
+}
+
+function createWorkletURL() {
+  const code = `
+    class PCMProcessor extends AudioWorkletProcessor {
+      constructor() {
+        super();
+        this.buffer = [];
+        this.chunkSize = Math.floor(${SAMPLE_RATE} * ${CHUNK_DURATION_MS} / 1000);
+      }
+      process(inputs) {
+        const input = inputs[0];
+        if (input.length > 0) {
+          const channelData = input[0];
+          for (let i = 0; i < channelData.length; i++) {
+            this.buffer.push(channelData[i]);
+          }
+          while (this.buffer.length >= this.chunkSize) {
+            const chunk = new Float32Array(this.buffer.splice(0, this.chunkSize));
+            this.port.postMessage(chunk);
+          }
+        }
+        return true;
+      }
+    }
+    registerProcessor('pcm-processor', PCMProcessor);
+  `;
+  const blob = new Blob([code], { type: 'application/javascript' });
+  return URL.createObjectURL(blob);
+}
+</script>
+</body>
+</html>
