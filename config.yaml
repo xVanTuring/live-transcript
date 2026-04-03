@@ -13,10 +13,10 @@ streaming_engine:
     rule3_min_utterance_length: 20.0
 
 correction_engine:
-  provider: "sensevoice"
-  model: "FunAudioLLM/SenseVoiceSmall"
+  provider: "paraformer"
+  model: "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
   device: "cpu"
-  batch_size: 1
+  # hotword: "专业术语1 专业术语2"  # 空格分隔的热词，提升课程专有名词识别率
 
 audio:
   sample_rate: 16000

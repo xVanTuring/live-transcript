@@ -43,16 +43,21 @@ def create_engines(config: dict):
         )
         raise SystemExit(1)
 
-    # Correction engine (SenseVoice) — optional
+    # Correction engine — optional
     correction_config = config.get("correction_engine", {})
+    provider = correction_config.get("provider", "sensevoice")
     try:
-        from .asr.correction_engine import SenseVoiceCorrectionEngine
-        correction_engine = SenseVoiceCorrectionEngine(correction_config)
+        if provider == "paraformer":
+            from .asr.correction_engine import ParaformerCorrectionEngine
+            correction_engine = ParaformerCorrectionEngine(correction_config)
+        else:
+            from .asr.correction_engine import SenseVoiceCorrectionEngine
+            correction_engine = SenseVoiceCorrectionEngine(correction_config)
     except Exception as e:
         logger.warning(
-            "SenseVoice correction engine not available (%s). "
+            "Correction engine '%s' not available (%s). "
             "Running without 2nd-pass correction.",
-            e,
+            provider, e,
         )
         correction_engine = NullCorrectionEngine()
 
