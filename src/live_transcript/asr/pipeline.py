@@ -65,8 +65,12 @@ class ASRPipeline:
             start_time=time.monotonic(),
         )
         self._session_start = time.monotonic()
+        self._chunk_count = 0
+        self._total_decode_ms = 0.0
 
-    async def feed_audio(self, samples: np.ndarray) -> list[TranscriptEvent]:
+    async def feed_audio(
+        self, samples: np.ndarray, client_audio_ts: float = 0.0,
+    ) -> list[TranscriptEvent]:
         """Feed audio samples and return any transcript events to send."""
         events: list[TranscriptEvent] = []
 
@@ -75,7 +79,9 @@ class ASRPipeline:
             self._stream_handle, self._config.sample_rate, samples
         )
 
+        t0 = time.monotonic()
         result = self._streaming.decode(self._stream_handle)
+        decode_ms = (time.monotonic() - t0) * 1000
 
         # Calculate time offsets
         now = time.monotonic()
@@ -93,6 +99,8 @@ class ASRPipeline:
                         previous_text=self._segment.last_text,
                         start_time=seg_start_time,
                         end_time=current_time,
+                        processing_ms=round(decode_ms, 2),
+                        client_audio_ts=client_audio_ts,
                     )
                 else:
                     event = make_partial(
@@ -100,6 +108,8 @@ class ASRPipeline:
                         text=result.text,
                         start_time=seg_start_time,
                         end_time=current_time,
+                        processing_ms=round(decode_ms, 2),
+                        client_audio_ts=client_audio_ts,
                     )
                 events.append(event)
                 self._segment.last_text = result.text
@@ -107,14 +117,27 @@ class ASRPipeline:
 
         # Check for endpoint (sentence boundary)
         if result.is_endpoint and self._segment.last_text:
-            final_event = await self._finalize_segment(seg_start_time, current_time)
+            final_event = await self._finalize_segment(
+                seg_start_time, current_time, decode_ms, client_audio_ts,
+            )
             if final_event:
                 events.append(final_event)
+
+        # Log chunk timing periodically
+        self._chunk_count += 1
+        self._total_decode_ms += decode_ms
+        if self._chunk_count % 50 == 0:
+            avg = self._total_decode_ms / self._chunk_count
+            logger.info(
+                "Chunk stats: count=%d avg_decode=%.2fms last_decode=%.2fms",
+                self._chunk_count, avg, decode_ms,
+            )
 
         return events
 
     async def _finalize_segment(
-        self, seg_start_time: float, seg_end_time: float
+        self, seg_start_time: float, seg_end_time: float,
+        decode_ms: float = 0.0, client_audio_ts: float = 0.0,
     ) -> TranscriptEvent | None:
         """Run 2nd-pass correction on the completed segment."""
         seg = self._segment
@@ -122,6 +145,7 @@ class ASRPipeline:
 
         final_text = streaming_text
         language = ""
+        correction_ms = 0.0
 
         if self._config.enable_correction:
             segment_audio = self._buffer.extract(
@@ -129,14 +153,22 @@ class ASRPipeline:
             )
             if segment_audio is not None and len(segment_audio) > 0:
                 try:
+                    t0 = time.monotonic()
                     correction = await asyncio.to_thread(
                         self._correction.transcribe,
                         segment_audio,
                         self._config.sample_rate,
                     )
+                    correction_ms = (time.monotonic() - t0) * 1000
                     if correction.text:
                         final_text = correction.text
                         language = correction.language
+                    logger.info(
+                        "2nd-pass correction: %.2fms, audio=%.1fs, text=%r",
+                        correction_ms,
+                        len(segment_audio) / self._config.sample_rate,
+                        final_text[:60],
+                    )
                 except Exception:
                     logger.exception("2nd-pass correction failed, using streaming result")
 
@@ -146,6 +178,9 @@ class ASRPipeline:
             start_time=seg_start_time,
             end_time=seg_end_time,
             language=language,
+            processing_ms=round(decode_ms, 2),
+            correction_ms=round(correction_ms, 2),
+            client_audio_ts=client_audio_ts,
         )
 
         # Reset for next segment

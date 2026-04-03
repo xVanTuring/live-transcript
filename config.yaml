@@ -24,4 +24,4 @@ audio:
   ring_buffer_seconds: 60
 
 protocol:
-  debounce_partial_ms: 100
+  debounce_partial_ms: 30

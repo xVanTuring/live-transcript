@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -104,11 +105,19 @@ async def websocket_transcribe(ws: WebSocket):
 
             if "bytes" in message and message["bytes"]:
                 # Binary frame: audio data
+                recv_ts = time.time()
                 samples = pcm_s16le_to_float32(message["bytes"])
-                events = await pipeline.feed_audio(samples)
+                events = await pipeline.feed_audio(samples, client_audio_ts=recv_ts)
+                send_ts = time.time()
                 for event in events:
                     if ws.client_state == WebSocketState.CONNECTED:
                         await ws.send_text(event.to_json())
+                if events:
+                    total_ms = (send_ts - recv_ts) * 1000
+                    logger.debug(
+                        "Chunk → %d events in %.1fms",
+                        len(events), total_ms,
+                    )
 
             elif "text" in message and message["text"]:
                 # Text frame: control message

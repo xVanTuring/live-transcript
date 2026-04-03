@@ -45,12 +45,20 @@ class TranscriptEvent:
     language: str = ""
     previous_text: str = ""
     timestamp: float = field(default_factory=time.time)
+    # Latency metrics (ms)
+    processing_ms: float = 0.0     # ASR decode time for this chunk
+    correction_ms: float = 0.0     # 2nd-pass correction time (final only)
+    client_audio_ts: float = 0.0   # echoed back from client for RTT calc
 
     def to_json(self) -> str:
         d = asdict(self)
         d["type"] = self.type.value
         # Remove empty optional fields
         for key in ("language", "previous_text"):
+            if not d[key]:
+                del d[key]
+        # Remove zero-value latency fields to keep messages compact
+        for key in ("processing_ms", "correction_ms", "client_audio_ts"):
             if not d[key]:
                 del d[key]
         return json.dumps(d, ensure_ascii=False)
@@ -72,18 +80,24 @@ def parse_client_message(raw: str) -> tuple[MessageType, dict[str, Any]]:
     return msg_type, data
 
 
-def make_partial(segment_id: int, text: str, start_time: float, end_time: float) -> TranscriptEvent:
+def make_partial(
+    segment_id: int, text: str, start_time: float, end_time: float,
+    processing_ms: float = 0.0, client_audio_ts: float = 0.0,
+) -> TranscriptEvent:
     return TranscriptEvent(
         type=MessageType.PARTIAL,
         segment_id=segment_id,
         text=text,
         start_time=start_time,
         end_time=end_time,
+        processing_ms=processing_ms,
+        client_audio_ts=client_audio_ts,
     )
 
 
 def make_correction(
-    segment_id: int, text: str, previous_text: str, start_time: float, end_time: float
+    segment_id: int, text: str, previous_text: str, start_time: float, end_time: float,
+    processing_ms: float = 0.0, client_audio_ts: float = 0.0,
 ) -> TranscriptEvent:
     return TranscriptEvent(
         type=MessageType.CORRECTION,
@@ -92,11 +106,14 @@ def make_correction(
         previous_text=previous_text,
         start_time=start_time,
         end_time=end_time,
+        processing_ms=processing_ms,
+        client_audio_ts=client_audio_ts,
     )
 
 
 def make_final(
-    segment_id: int, text: str, start_time: float, end_time: float, language: str = ""
+    segment_id: int, text: str, start_time: float, end_time: float, language: str = "",
+    processing_ms: float = 0.0, correction_ms: float = 0.0, client_audio_ts: float = 0.0,
 ) -> TranscriptEvent:
     return TranscriptEvent(
         type=MessageType.FINAL,
@@ -105,4 +122,7 @@ def make_final(
         start_time=start_time,
         end_time=end_time,
         language=language,
+        processing_ms=processing_ms,
+        correction_ms=correction_ms,
+        client_audio_ts=client_audio_ts,
     )
