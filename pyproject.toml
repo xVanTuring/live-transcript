@@ -12,9 +12,6 @@ dependencies = [
     "uvicorn[standard]>=0.30",
     "websockets>=13.0",
     "sherpa-onnx>=1.12",
-    "funasr>=1.2",
-    "torch>=2.0",
-    "torchaudio>=2.0",
     "jieba>=0.42",
     "numpy>=1.26",
     "pyyaml>=6.0",
@@ -29,6 +26,11 @@ dev = [
 benchmark = [
     "jiwer>=3.0",
     "pydub>=0.25",
+]
+funasr = [
+    "funasr>=1.2",
+    "torch>=2.0",
+    "torchaudio>=2.0",
 ]
 
 [tool.setuptools.packages.find]

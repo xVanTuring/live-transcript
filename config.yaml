@@ -20,10 +20,13 @@ streaming_engine:
     # hotwords_file: ""     # 可选：静态热词文件路径（每行一个词）
 
 correction_engine:
-  provider: "paraformer"
-  model: "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
-  device: "cpu"
-  # hotword: "专业术语1 专业术语2"  # 空格分隔的热词，提升课程专有名词识别率
+  provider: "sherpa-offline"
+  model_dir: "./models/sherpa-onnx-paraformer-zh-2024-03-09"
+  num_threads: 2
+  # 备选 provider:
+  # provider: "paraformer"    # FunASR Paraformer-Large (需要 torch + funasr，更慢但支持热词)
+  # model: "iic/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch"
+  # provider: "sensevoice"    # FunASR SenseVoice-Small (多语言，较轻量)
 
 audio:
   sample_rate: 16000

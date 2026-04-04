@@ -275,18 +275,17 @@ def save_results_json(output_path: Path, all_results: dict[str, list[RunResult]]
 
 def create_correction_engine(config: dict):
     """Create a correction engine from config dict (same logic as main.py)."""
-    from live_transcript.asr.correction_engine import (
-        NullCorrectionEngine,
-        ParaformerCorrectionEngine,
-        SenseVoiceCorrectionEngine,
-    )
-
     correction_config = config.get("correction_engine", {})
-    provider = correction_config.get("provider", "sensevoice")
+    provider = correction_config.get("provider", "sherpa-offline")
 
-    if provider == "paraformer":
+    if provider == "sherpa-offline":
+        from live_transcript.asr.correction_engine import SherpaOfflineCorrectionEngine
+        return SherpaOfflineCorrectionEngine(correction_config)
+    elif provider == "paraformer":
+        from live_transcript.asr.correction_engine import ParaformerCorrectionEngine
         return ParaformerCorrectionEngine(correction_config)
     elif provider == "sensevoice":
+        from live_transcript.asr.correction_engine import SenseVoiceCorrectionEngine
         return SenseVoiceCorrectionEngine(correction_config)
     else:
         raise ValueError(f"Unknown correction engine provider: {provider}")

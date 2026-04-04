@@ -12,6 +12,11 @@ SHERPA_URL = (
     f"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/{SHERPA_MODEL}.tar.bz2"
 )
 
+SHERPA_OFFLINE_MODEL = "sherpa-onnx-paraformer-zh-2024-03-09"
+SHERPA_OFFLINE_URL = (
+    f"https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/{SHERPA_OFFLINE_MODEL}.tar.bz2"
+)
+
 
 def download_sherpa_model():
     dest = MODELS_DIR / SHERPA_MODEL
@@ -26,6 +31,32 @@ def download_sherpa_model():
     print(f"  URL: {SHERPA_URL}")
     subprocess.run(
         ["curl", "-L", "-o", str(archive), SHERPA_URL],
+        check=True,
+    )
+
+    print("Extracting...")
+    subprocess.run(
+        ["tar", "xjf", str(archive), "-C", str(MODELS_DIR)],
+        check=True,
+    )
+    archive.unlink()
+    print(f"[OK] Model extracted to {dest}")
+
+
+def download_sherpa_offline_model():
+    """Download sherpa-onnx offline Paraformer model for 2nd-pass correction."""
+    dest = MODELS_DIR / SHERPA_OFFLINE_MODEL
+    if dest.exists():
+        print(f"[OK] sherpa-onnx offline model already exists: {dest}")
+        return
+
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    archive = MODELS_DIR / f"{SHERPA_OFFLINE_MODEL}.tar.bz2"
+
+    print("Downloading sherpa-onnx offline Paraformer zh model...")
+    print(f"  URL: {SHERPA_OFFLINE_URL}")
+    subprocess.run(
+        ["curl", "-L", "-o", str(archive), SHERPA_OFFLINE_URL],
         check=True,
     )
 
@@ -58,6 +89,8 @@ def main():
     print()
 
     download_sherpa_model()
+    print()
+    download_sherpa_offline_model()
     print()
     download_sensevoice_model()
 

@@ -1,14 +1,65 @@
-"""2nd-pass correction engine wrappers (SenseVoice, Paraformer)."""
+"""2nd-pass correction engine wrappers (sherpa-onnx offline, FunASR Paraformer, SenseVoice)."""
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 
 from .base import CorrectionEngine, CorrectionResult
 
 logger = logging.getLogger(__name__)
+
+
+class SherpaOfflineCorrectionEngine(CorrectionEngine):
+    """Wraps sherpa-onnx OfflineRecognizer (Paraformer) for fast CPU inference.
+
+    Uses ONNX Runtime instead of PyTorch — significantly faster on CPU,
+    no torch/funasr dependencies required.
+    """
+
+    def __init__(self, config: dict):
+        import sherpa_onnx
+
+        model_dir = Path(config.get(
+            "model_dir",
+            "./models/sherpa-onnx-paraformer-zh-2024-03-09",
+        ))
+        num_threads = config.get("num_threads", 2)
+
+        # Prefer int8 quantized model for speed
+        model_file = model_dir / "model.int8.onnx"
+        if not model_file.exists():
+            model_file = model_dir / "model.onnx"
+        tokens = model_dir / "tokens.txt"
+
+        if not model_file.exists():
+            raise FileNotFoundError(
+                f"Offline paraformer model not found at {model_dir}. "
+                "Run 'python scripts/download_models.py' to download."
+            )
+
+        self._recognizer = sherpa_onnx.OfflineRecognizer.from_paraformer(
+            paraformer=str(model_file),
+            tokens=str(tokens),
+            num_threads=num_threads,
+            sample_rate=16000,
+            feature_dim=80,
+            decoding_method="greedy_search",
+        )
+        logger.info(
+            "sherpa-onnx offline Paraformer loaded: %s (threads=%d)",
+            model_file.name, num_threads,
+        )
+
+    def transcribe(self, samples: np.ndarray, sample_rate: int = 16000) -> CorrectionResult:
+        stream = self._recognizer.create_stream()
+        stream.accept_waveform(sample_rate, samples)
+        self._recognizer.decode_stream(stream)
+
+        text = stream.result.text.strip()
+        return CorrectionResult(text=text, language="zh")
 
 
 class SenseVoiceCorrectionEngine(CorrectionEngine):

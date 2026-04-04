@@ -45,7 +45,10 @@ pip install -e ".[dev]"
 # Install benchmark dependencies (jiwer, pydub)
 pip install -e ".[benchmark]"
 
-# Download models (sherpa-onnx bilingual zh-en)
+# Install FunASR engines (optional, only if using paraformer/sensevoice provider)
+pip install -e ".[funasr]"
+
+# Download models (sherpa-onnx streaming + offline paraformer)
 python scripts/download_models.py
 
 # Run server
@@ -86,10 +89,15 @@ Runtime config in `config.yaml`.
 - `streaming_engine.hotwords.hotwords_file`: optional path to static hotwords file (one word per line)
 
 ### Correction Engine (2nd-pass)
-- `correction_engine.provider`: `paraformer` (default, best Chinese accuracy) or `sensevoice`
-- `correction_engine.model`: model name/path
-- `correction_engine.device`: `cpu` or `cuda`
-- `correction_engine.hotword`: space-separated hotwords for Paraformer (e.g. `"机器学习 深度学习"`)
+- `correction_engine.provider`: engine provider, one of:
+  - `sherpa-offline` (default): sherpa-onnx offline Paraformer — fast ONNX Runtime inference, no torch dependency
+  - `paraformer`: FunASR Paraformer-Large-VAD-Punc — best accuracy, supports hotwords, requires `pip install -e ".[funasr]"`
+  - `sensevoice`: FunASR SenseVoice-Small — multilingual, requires `pip install -e ".[funasr]"`
+- `correction_engine.model_dir`: model directory path (sherpa-offline)
+- `correction_engine.num_threads`: ONNX Runtime threads (sherpa-offline, default 2)
+- `correction_engine.model`: FunASR model name/path (paraformer/sensevoice)
+- `correction_engine.device`: `cpu` or `cuda` (paraformer/sensevoice)
+- `correction_engine.hotword`: space-separated hotwords for FunASR Paraformer (e.g. `"机器学习 深度学习"`)
 - `correction_engine.language`: language hint for SenseVoice (default `zh`, also supports `auto`)
 
 ### Audio & Protocol

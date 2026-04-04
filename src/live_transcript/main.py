@@ -47,12 +47,17 @@ def create_engines(config: dict):
     correction_config = config.get("correction_engine", {})
     provider = correction_config.get("provider", "sensevoice")
     try:
-        if provider == "paraformer":
+        if provider == "sherpa-offline":
+            from .asr.correction_engine import SherpaOfflineCorrectionEngine
+            correction_engine = SherpaOfflineCorrectionEngine(correction_config)
+        elif provider == "paraformer":
             from .asr.correction_engine import ParaformerCorrectionEngine
             correction_engine = ParaformerCorrectionEngine(correction_config)
-        else:
+        elif provider == "sensevoice":
             from .asr.correction_engine import SenseVoiceCorrectionEngine
             correction_engine = SenseVoiceCorrectionEngine(correction_config)
+        else:
+            raise ValueError(f"Unknown correction engine provider: {provider}")
     except Exception as e:
         logger.warning(
             "Correction engine '%s' not available (%s). "
