@@ -12,9 +12,9 @@ streaming_engine:
   sample_rate: 16000
   device: "cuda"              # GPU-accelerated streaming decode
   endpoint:
-    rule1_min_trailing_silence: 2.4
-    rule2_min_trailing_silence: 1.2
-    rule3_min_utterance_length: 20.0
+    rule1_min_trailing_silence: 2.4     # 长停顿断句
+    rule2_min_trailing_silence: 0.8     # 句间短停顿断句（课程场景调短）
+    rule3_min_utterance_length: 8.0     # 连续说话最长强制断句（秒）
   hotwords:
     enabled: true             # GPU has headroom for beam search
     score: 1.5
