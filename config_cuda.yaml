@@ -14,13 +14,14 @@ streaming_engine:
   endpoint:
     rule1_min_trailing_silence: 2.4     # 长停顿断句
     rule2_min_trailing_silence: 0.8     # 句间短停顿断句（课程场景调短）
-    rule3_min_utterance_length: 8.0     # 连续说话最长强制断句（秒）
+    rule3_min_utterance_length: 3.0     # 连续说话最长强制断句（秒）
   hotwords:
     enabled: true             # GPU has headroom for beam search
-    score: 1.5
+    score: 2.0                # 提高热词权重
     max_active_paths: 4
     max_words: 50
     min_word_length: 2
+    hotwords_file: "./hotwords.txt"   # 静态热词（课程专有名词）
 
 correction_engine:
   provider: "sherpa-offline"
