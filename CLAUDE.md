@@ -51,9 +51,13 @@ pip install -e ".[funasr]"
 # Download models (sherpa-onnx streaming + offline paraformer)
 python scripts/download_models.py
 
-# Run server
+# Run server (CPU)
 python -m live_transcript
 python -m live_transcript -c config.yaml
+
+# Run server (CUDA — requires onnxruntime-gpu)
+pip install onnxruntime-gpu
+python -m live_transcript -c config_cuda.yaml
 
 # Test clients
 python client/py_client.py --mic
@@ -75,6 +79,7 @@ Runtime config in `config.yaml`.
 
 ### Streaming Engine (sherpa-onnx)
 - `streaming_engine.model_dir`: path to sherpa-onnx model
+- `streaming_engine.device`: ONNX Runtime provider — `cpu` (default) or `cuda`
 - `streaming_engine.num_threads`: decode threads (default 2)
 - `streaming_engine.endpoint.rule1_min_trailing_silence`: long silence threshold (default 2.4s)
 - `streaming_engine.endpoint.rule2_min_trailing_silence`: sentence boundary silence threshold (default 1.2s)
@@ -94,9 +99,9 @@ Runtime config in `config.yaml`.
   - `paraformer`: FunASR Paraformer-Large-VAD-Punc — best accuracy, supports hotwords, requires `pip install -e ".[funasr]"`
   - `sensevoice`: FunASR SenseVoice-Small — multilingual, requires `pip install -e ".[funasr]"`
 - `correction_engine.model_dir`: model directory path (sherpa-offline)
+- `correction_engine.device`: `cpu` (default) or `cuda` — all providers support GPU acceleration
 - `correction_engine.num_threads`: ONNX Runtime threads (sherpa-offline, default 2)
 - `correction_engine.model`: FunASR model name/path (paraformer/sensevoice)
-- `correction_engine.device`: `cpu` or `cuda` (paraformer/sensevoice)
 - `correction_engine.hotword`: space-separated hotwords for FunASR Paraformer (e.g. `"机器学习 深度学习"`)
 - `correction_engine.language`: language hint for SenseVoice (default `zh`, also supports `auto`)
 

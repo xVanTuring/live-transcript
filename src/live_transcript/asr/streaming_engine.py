@@ -29,6 +29,7 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
         model_dir = Path(config["model_dir"])
         num_threads = config.get("num_threads", 2)
         sample_rate = config.get("sample_rate", 16000)
+        provider = config.get("device", "cpu")
         ep = config.get("endpoint", {})
         hotwords_cfg = config.get("hotwords", {})
 
@@ -36,14 +37,23 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
         tokens = str(model_dir / "tokens.txt")
 
         # Check for transducer model files
-        encoder = model_dir / "encoder-epoch-99-avg-1.onnx"
-        decoder = model_dir / "decoder-epoch-99-avg-1.onnx"
-        joiner = model_dir / "joiner-epoch-99-avg-1.onnx"
-
-        if not encoder.exists():
+        # CUDA: prefer fp32 for accuracy; CPU: prefer int8 for speed
+        if provider == "cuda":
+            encoder = model_dir / "encoder-epoch-99-avg-1.onnx"
+            decoder = model_dir / "decoder-epoch-99-avg-1.onnx"
+            joiner = model_dir / "joiner-epoch-99-avg-1.onnx"
+            if not encoder.exists():
+                encoder = model_dir / "encoder-epoch-99-avg-1.int8.onnx"
+                decoder = model_dir / "decoder-epoch-99-avg-1.int8.onnx"
+                joiner = model_dir / "joiner-epoch-99-avg-1.int8.onnx"
+        else:
             encoder = model_dir / "encoder-epoch-99-avg-1.int8.onnx"
             decoder = model_dir / "decoder-epoch-99-avg-1.int8.onnx"
             joiner = model_dir / "joiner-epoch-99-avg-1.int8.onnx"
+            if not encoder.exists():
+                encoder = model_dir / "encoder-epoch-99-avg-1.onnx"
+                decoder = model_dir / "decoder-epoch-99-avg-1.onnx"
+                joiner = model_dir / "joiner-epoch-99-avg-1.onnx"
 
         # Hotwords require modified_beam_search
         self._hotwords_enabled = hotwords_cfg.get("enabled", False)
@@ -59,6 +69,7 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
             rule2_min_trailing_silence=ep.get("rule2_min_trailing_silence", 1.2),
             rule3_min_utterance_length=ep.get("rule3_min_utterance_length", 20.0),
             decoding_method=decoding_method,
+            provider=provider,
         )
 
         if self._hotwords_enabled:
@@ -93,8 +104,8 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
 
         self._sample_rate = sample_rate
         logger.info(
-            "sherpa-onnx streaming engine initialized from %s (decoding=%s, hotwords=%s)",
-            model_dir, decoding_method, self._hotwords_enabled,
+            "sherpa-onnx streaming engine initialized from %s (provider=%s, decoding=%s, hotwords=%s)",
+            model_dir, provider, decoding_method, self._hotwords_enabled,
         )
 
     def create_stream(self, hotwords: str = "") -> SherpaStreamHandle:

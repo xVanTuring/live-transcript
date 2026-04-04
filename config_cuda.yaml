@@ -1,0 +1,37 @@
+# CUDA high-performance config — optimized for RTX 4090 class GPUs
+# Usage: python -m live_transcript -c config_cuda.yaml
+# Requires: pip install onnxruntime-gpu (replaces onnxruntime)
+
+server:
+  host: "0.0.0.0"
+  port: 8765
+
+streaming_engine:
+  model_dir: "./models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20"
+  num_threads: 4
+  sample_rate: 16000
+  device: "cuda"              # GPU-accelerated streaming decode
+  endpoint:
+    rule1_min_trailing_silence: 2.4
+    rule2_min_trailing_silence: 1.2
+    rule3_min_utterance_length: 20.0
+  hotwords:
+    enabled: true             # GPU has headroom for beam search
+    score: 1.5
+    max_active_paths: 4
+    max_words: 50
+    min_word_length: 2
+
+correction_engine:
+  provider: "sherpa-offline"
+  model_dir: "./models/sherpa-onnx-paraformer-zh-2024-03-09"
+  num_threads: 4
+  device: "cuda"              # GPU-accelerated 2nd-pass
+
+audio:
+  sample_rate: 16000
+  chunk_duration_ms: 60
+  ring_buffer_seconds: 60
+
+protocol:
+  debounce_partial_ms: 30

@@ -13,10 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class SherpaOfflineCorrectionEngine(CorrectionEngine):
-    """Wraps sherpa-onnx OfflineRecognizer (Paraformer) for fast CPU inference.
+    """Wraps sherpa-onnx OfflineRecognizer (Paraformer) for fast inference.
 
-    Uses ONNX Runtime instead of PyTorch — significantly faster on CPU,
-    no torch/funasr dependencies required.
+    Uses ONNX Runtime — significantly faster than PyTorch on CPU,
+    and supports CUDA for GPU acceleration. No torch/funasr dependencies required.
     """
 
     def __init__(self, config: dict):
@@ -27,11 +27,18 @@ class SherpaOfflineCorrectionEngine(CorrectionEngine):
             "./models/sherpa-onnx-paraformer-zh-2024-03-09",
         ))
         num_threads = config.get("num_threads", 2)
+        provider = config.get("device", "cpu")
 
-        # Prefer int8 quantized model for speed
-        model_file = model_dir / "model.int8.onnx"
-        if not model_file.exists():
+        # CUDA: prefer fp32 for accuracy; CPU: prefer int8 for speed
+        if provider == "cuda":
             model_file = model_dir / "model.onnx"
+            if not model_file.exists():
+                model_file = model_dir / "model.int8.onnx"
+        else:
+            model_file = model_dir / "model.int8.onnx"
+            if not model_file.exists():
+                model_file = model_dir / "model.onnx"
+
         tokens = model_dir / "tokens.txt"
 
         if not model_file.exists():
@@ -47,10 +54,11 @@ class SherpaOfflineCorrectionEngine(CorrectionEngine):
             sample_rate=16000,
             feature_dim=80,
             decoding_method="greedy_search",
+            provider=provider,
         )
         logger.info(
-            "sherpa-onnx offline Paraformer loaded: %s (threads=%d)",
-            model_file.name, num_threads,
+            "sherpa-onnx offline Paraformer loaded: %s (provider=%s, threads=%d)",
+            model_file.name, provider, num_threads,
         )
 
     def transcribe(self, samples: np.ndarray, sample_rate: int = 16000) -> CorrectionResult:
