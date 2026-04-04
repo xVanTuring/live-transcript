@@ -10,6 +10,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
 
 from .asr.base import CorrectionEngine, StreamingEngine
+from .asr.hotword_manager import HotwordManagerConfig
 from .asr.pipeline import ASRPipeline, PipelineConfig
 from .audio_buffer import pcm_s16le_to_float32
 from .protocol import ErrorEvent, MessageType, StartConfig, TranscriptEvent, parse_client_message
@@ -68,11 +69,20 @@ async def websocket_transcribe(ws: WebSocket):
         proto_config = _app_config.get("protocol", {})
         audio_config = _app_config.get("audio", {})
 
+        hotwords_cfg = _app_config.get("streaming_engine", {}).get("hotwords", {})
+        hotword_config = HotwordManagerConfig(
+            enabled=hotwords_cfg.get("enabled", False),
+            max_words=hotwords_cfg.get("max_words", 50),
+            min_word_length=hotwords_cfg.get("min_word_length", 2),
+            score=hotwords_cfg.get("score", 1.5),
+        )
+
         pipeline_config = PipelineConfig(
             sample_rate=client_config.sample_rate,
             enable_correction=client_config.enable_correction,
             debounce_ms=proto_config.get("debounce_partial_ms", 100),
             ring_buffer_seconds=audio_config.get("ring_buffer_seconds", 60),
+            hotword_config=hotword_config,
         )
 
         pipeline = ASRPipeline(

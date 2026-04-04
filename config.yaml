@@ -11,6 +11,13 @@ streaming_engine:
     rule1_min_trailing_silence: 2.4
     rule2_min_trailing_silence: 1.2
     rule3_min_utterance_length: 20.0
+  hotwords:
+    enabled: false          # 设为 true 启用动态热词
+    score: 1.5              # 热词加分权重
+    max_active_paths: 4     # beam search 路径数
+    max_words: 50           # 动态热词滑动窗口大小
+    min_word_length: 2      # 最小词长（过滤单字）
+    # hotwords_file: ""     # 可选：静态热词文件路径（每行一个词）
 
 correction_engine:
   provider: "paraformer"

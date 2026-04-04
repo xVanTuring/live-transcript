@@ -30,6 +30,7 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
         num_threads = config.get("num_threads", 2)
         sample_rate = config.get("sample_rate", 16000)
         ep = config.get("endpoint", {})
+        hotwords_cfg = config.get("hotwords", {})
 
         # Detect model type from directory contents
         tokens = str(model_dir / "tokens.txt")
@@ -44,6 +45,10 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
             decoder = model_dir / "decoder-epoch-99-avg-1.int8.onnx"
             joiner = model_dir / "joiner-epoch-99-avg-1.int8.onnx"
 
+        # Hotwords require modified_beam_search
+        self._hotwords_enabled = hotwords_cfg.get("enabled", False)
+        decoding_method = "modified_beam_search" if self._hotwords_enabled else "greedy_search"
+
         recognizer_kwargs = dict(
             tokens=tokens,
             num_threads=num_threads,
@@ -53,7 +58,22 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
             rule1_min_trailing_silence=ep.get("rule1_min_trailing_silence", 2.4),
             rule2_min_trailing_silence=ep.get("rule2_min_trailing_silence", 1.2),
             rule3_min_utterance_length=ep.get("rule3_min_utterance_length", 20.0),
+            decoding_method=decoding_method,
         )
+
+        if self._hotwords_enabled:
+            recognizer_kwargs["max_active_paths"] = hotwords_cfg.get("max_active_paths", 4)
+            hotwords_file = hotwords_cfg.get("hotwords_file", "")
+            if hotwords_file and Path(hotwords_file).exists():
+                recognizer_kwargs["hotwords_file"] = hotwords_file
+            recognizer_kwargs["hotwords_score"] = hotwords_cfg.get("score", 1.5)
+            # BPE vocab for bilingual models
+            bpe_vocab = model_dir / "bpe.vocab"
+            if bpe_vocab.exists():
+                recognizer_kwargs["modeling_unit"] = "cjkchar+bpe"
+                recognizer_kwargs["bpe_vocab"] = str(bpe_vocab)
+            else:
+                recognizer_kwargs["modeling_unit"] = "cjkchar"
 
         if encoder.exists():
             # Transducer model
@@ -72,10 +92,16 @@ class SherpaOnnxStreamingEngine(StreamingEngine):
             )
 
         self._sample_rate = sample_rate
-        logger.info("sherpa-onnx streaming engine initialized from %s", model_dir)
+        logger.info(
+            "sherpa-onnx streaming engine initialized from %s (decoding=%s, hotwords=%s)",
+            model_dir, decoding_method, self._hotwords_enabled,
+        )
 
-    def create_stream(self) -> SherpaStreamHandle:
-        stream = self._recognizer.create_stream()
+    def create_stream(self, hotwords: str = "") -> SherpaStreamHandle:
+        if hotwords and self._hotwords_enabled:
+            stream = self._recognizer.create_stream(hotwords=hotwords)
+        else:
+            stream = self._recognizer.create_stream()
         return SherpaStreamHandle(stream=stream)
 
     def accept_waveform(self, handle: SherpaStreamHandle, sample_rate: int, samples: np.ndarray) -> None:

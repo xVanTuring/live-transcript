@@ -17,6 +17,7 @@ from ..protocol import (
     make_partial,
 )
 from .base import CorrectionEngine, StreamingEngine
+from .hotword_manager import HotwordManager, HotwordManagerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class PipelineConfig:
     enable_correction: bool = True
     debounce_ms: float = 100.0
     ring_buffer_seconds: float = 60.0
+    hotword_config: HotwordManagerConfig = field(default_factory=HotwordManagerConfig)
 
 
 class ASRPipeline:
@@ -58,6 +60,7 @@ class ASRPipeline:
             max_seconds=self._config.ring_buffer_seconds,
             sample_rate=self._config.sample_rate,
         )
+        self._hotwords = HotwordManager(self._config.hotword_config)
         self._stream_handle = self._streaming.create_stream()
         self._segment = SegmentState(
             segment_id=0,
@@ -183,8 +186,18 @@ class ASRPipeline:
             client_audio_ts=client_audio_ts,
         )
 
-        # Reset for next segment
-        self._streaming.reset(self._stream_handle)
+        # Update dynamic hotwords from corrected text
+        self._hotwords.update(final_text)
+
+        # Rebuild stream with updated hotwords, or just reset
+        if self._hotwords.enabled and self._hotwords.get_hotwords_str():
+            self._stream_handle = self._streaming.create_stream(
+                hotwords=self._hotwords.get_hotwords_str(),
+            )
+            logger.debug("Stream rebuilt with %d hotwords", len(self._hotwords._words))
+        else:
+            self._streaming.reset(self._stream_handle)
+
         self._segment = SegmentState(
             segment_id=seg.segment_id + 1,
             start_sample=self._buffer.total_samples_written,

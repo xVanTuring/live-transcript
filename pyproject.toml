@@ -15,6 +15,7 @@ dependencies = [
     "funasr>=1.2",
     "torch>=2.0",
     "torchaudio>=2.0",
+    "jieba>=0.42",
     "numpy>=1.26",
     "pyyaml>=6.0",
 ]
