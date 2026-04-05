@@ -96,14 +96,18 @@ Runtime config in `config.yaml`.
 ### Correction Engine (2nd-pass)
 - `correction_engine.provider`: engine provider, one of:
   - `sherpa-offline` (default): sherpa-onnx offline Paraformer — fast ONNX Runtime inference, no torch dependency
-  - `paraformer`: FunASR Paraformer-Large-VAD-Punc — best accuracy, supports hotwords, requires `pip install -e ".[funasr]"`
+  - `whisper`: faster-whisper — best mixed zh-en accuracy, requires GPU, `pip install -e ".[whisper]"`
+  - `paraformer`: FunASR Paraformer-Large-VAD-Punc — supports hotwords, requires `pip install -e ".[funasr]"`
   - `sensevoice`: FunASR SenseVoice-Small — multilingual, requires `pip install -e ".[funasr]"`
-- `correction_engine.model_dir`: model directory path (sherpa-offline)
 - `correction_engine.device`: `cpu` (default) or `cuda` — all providers support GPU acceleration
+- `correction_engine.model_dir`: model directory path (sherpa-offline)
 - `correction_engine.num_threads`: ONNX Runtime threads (sherpa-offline, default 2)
-- `correction_engine.model`: FunASR model name/path (paraformer/sensevoice)
+- `correction_engine.model`: model name — Whisper: `large-v3`/`medium`/`turbo`; FunASR: model path
+- `correction_engine.compute_type`: Whisper compute type — `float16` (fastest on GPU) / `int8_float16` / `int8`
+- `correction_engine.beam_size`: Whisper beam size (default 5)
+- `correction_engine.initial_prompt`: Whisper prompt to guide style/vocabulary
 - `correction_engine.hotword`: space-separated hotwords for FunASR Paraformer (e.g. `"机器学习 深度学习"`)
-- `correction_engine.language`: language hint for SenseVoice (default `zh`, also supports `auto`)
+- `correction_engine.language`: language hint (default `zh`, also supports `auto`)
 
 ### Audio & Protocol
 - `audio.sample_rate`: target sample rate (default 16000)

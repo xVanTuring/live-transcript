@@ -50,6 +50,9 @@ def create_engines(config: dict):
         if provider == "sherpa-offline":
             from .asr.correction_engine import SherpaOfflineCorrectionEngine
             correction_engine = SherpaOfflineCorrectionEngine(correction_config)
+        elif provider == "whisper":
+            from .asr.correction_engine import WhisperCorrectionEngine
+            correction_engine = WhisperCorrectionEngine(correction_config)
         elif provider == "paraformer":
             from .asr.correction_engine import ParaformerCorrectionEngine
             correction_engine = ParaformerCorrectionEngine(correction_config)

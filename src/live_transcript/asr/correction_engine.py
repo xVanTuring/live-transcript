@@ -1,4 +1,4 @@
-"""2nd-pass correction engine wrappers (sherpa-onnx offline, FunASR Paraformer, SenseVoice)."""
+"""2nd-pass correction engine wrappers (sherpa-onnx offline, faster-whisper, FunASR Paraformer, SenseVoice)."""
 
 from __future__ import annotations
 
@@ -68,6 +68,52 @@ class SherpaOfflineCorrectionEngine(CorrectionEngine):
 
         text = stream.result.text.strip()
         return CorrectionResult(text=text, language="zh")
+
+
+class WhisperCorrectionEngine(CorrectionEngine):
+    """Wraps faster-whisper for high-accuracy 2nd-pass correction.
+
+    Best accuracy for mixed Chinese/English content. Requires GPU for
+    low-latency inference (RTX 4090: ~50-100ms for 3-8s audio).
+    """
+
+    def __init__(self, config: dict):
+        from faster_whisper import WhisperModel
+
+        model_size = config.get("model", "large-v3")
+        device = config.get("device", "cuda")
+        compute_type = config.get("compute_type", "float16")
+        self._language = config.get("language", "zh")
+        self._initial_prompt = config.get(
+            "initial_prompt",
+            "以下是普通话语音识别，包含中英文内容。",
+        )
+        self._beam_size = config.get("beam_size", 5)
+
+        self._model = WhisperModel(
+            model_size,
+            device=device,
+            compute_type=compute_type,
+        )
+        logger.info(
+            "faster-whisper correction engine loaded: %s (device=%s, compute_type=%s)",
+            model_size, device, compute_type,
+        )
+
+    def transcribe(self, samples: np.ndarray, sample_rate: int = 16000) -> CorrectionResult:
+        segments, info = self._model.transcribe(
+            samples,
+            language=self._language,
+            beam_size=self._beam_size,
+            initial_prompt=self._initial_prompt,
+            vad_filter=False,
+            condition_on_previous_text=False,
+        )
+
+        text = "".join(seg.text for seg in segments).strip()
+        language = info.language or self._language
+
+        return CorrectionResult(text=text, language=language)
 
 
 class SenseVoiceCorrectionEngine(CorrectionEngine):

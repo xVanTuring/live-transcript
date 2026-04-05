@@ -27,6 +27,9 @@ benchmark = [
     "jiwer>=3.0",
     "pydub>=0.25",
 ]
+whisper = [
+    "faster-whisper>=1.0",
+]
 funasr = [
     "funasr>=1.2",
     "torch>=2.0",

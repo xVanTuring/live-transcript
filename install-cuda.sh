@@ -98,7 +98,7 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 info "Installing live-transcript from $PROJECT_DIR..."
-pip install -e .
+pip install -e ".[whisper]"
 
 # --- Install sherpa-onnx CUDA wheel ----------------------------------------
 info "Installing sherpa-onnx ${SHERPA_ONNX_VERSION}${SHERPA_CUDA_SUFFIX}..."

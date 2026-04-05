@@ -14,7 +14,7 @@ streaming_engine:
   endpoint:
     rule1_min_trailing_silence: 2.4     # 长停顿断句
     rule2_min_trailing_silence: 0.8     # 句间短停顿断句（课程场景调短）
-    rule3_min_utterance_length: 3.0     # 连续说话最长强制断句（秒）
+    rule3_min_utterance_length: 8.0     # 连续说话最长强制断句（秒）
   hotwords:
     enabled: true             # GPU has headroom for beam search
     score: 2.0                # 提高热词权重
@@ -24,10 +24,16 @@ streaming_engine:
     hotwords_file: "./hotwords.txt"   # 静态热词（课程专有名词）
 
 correction_engine:
-  provider: "sherpa-offline"
-  model_dir: "./models/sherpa-onnx-paraformer-zh-2024-03-09"
-  num_threads: 4
-  device: "cuda"              # GPU-accelerated 2nd-pass
+  provider: "whisper"
+  model: "large-v3"             # Whisper 模型: large-v3 / medium / small / turbo
+  device: "cuda"
+  compute_type: "float16"       # float16 最快 (4090)；int8_float16 省显存
+  language: "zh"
+  beam_size: 5
+  initial_prompt: "以下是普通话语音识别，包含中英文内容。"
+  # 备选 provider:
+  # provider: "sherpa-offline"  # sherpa-onnx Paraformer（快，无需额外依赖）
+  # model_dir: "./models/sherpa-onnx-paraformer-zh-2024-03-09"
 
 audio:
   sample_rate: 16000

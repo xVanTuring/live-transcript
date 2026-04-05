@@ -281,6 +281,9 @@ def create_correction_engine(config: dict):
     if provider == "sherpa-offline":
         from live_transcript.asr.correction_engine import SherpaOfflineCorrectionEngine
         return SherpaOfflineCorrectionEngine(correction_config)
+    elif provider == "whisper":
+        from live_transcript.asr.correction_engine import WhisperCorrectionEngine
+        return WhisperCorrectionEngine(correction_config)
     elif provider == "paraformer":
         from live_transcript.asr.correction_engine import ParaformerCorrectionEngine
         return ParaformerCorrectionEngine(correction_config)
