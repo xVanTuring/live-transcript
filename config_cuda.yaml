@@ -25,7 +25,7 @@ streaming_engine:
 
 correction_engine:
   provider: "whisper"
-  model: "large-v3"             # Whisper 模型: large-v3 / medium / small / turbo
+  model: "./models/faster-whisper-large-v3"             # HuggingFace 自动下载，或本地路径: "./models/faster-whisper-large-v3"
   device: "cuda"
   compute_type: "float16"       # float16 最快 (4090)；int8_float16 省显存
   language: "zh"
